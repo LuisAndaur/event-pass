@@ -142,23 +142,31 @@ services:
   # ============================================
 
   gateway:
-    build:
-      context: ./gateway
-      dockerfile: Dockerfile
+    image: devopsfaith/krakend:2.6
     container_name: eventpass-gateway
     restart: on-failure
     networks: [event-pass-net]
     ports: ["${GATEWAY_PORT}:8080"]
-    environment:
-      WAITING_ROOM_URL: http://waiting-room:8081
-      CATALOG_URL: http://catalog:8082
-      RESERVATION_URL: http://reservation:8083
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS}
+    volumes:
+      - ./gateway/krakend.json:/etc/krakend/krakend.json:ro
+    command: ["run", "-c", "/etc/krakend/krakend.json"]
     depends_on:
+      - auth
       - waiting-room
       - catalog
       - reservation
+
+  auth:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+    container_name: eventpass-auth
+    restart: on-failure
+    networks: [event-pass-net]
+    environment:
+      PORT: 8084
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS}
 
   waiting-room:
     build:

@@ -10,6 +10,24 @@ export const setAuthToken = (token) => {
 
 export const getAuthToken = () => authToken;
 
+// Decodes the JWT payload to expose the current user's identity and role.
+export const getUserInfo = () => {
+  const token = authToken || localStorage.getItem('eventpass_token');
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const isAdmin = () => getUserInfo()?.role === 'ROLE_ADMIN';
+
 const headers = () => ({
   'Content-Type': 'application/json',
   ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
@@ -50,11 +68,11 @@ export const getQueueStatus = (eventId, userId) =>
   }).then(handleResponse);
 
 // Reservations
-export const reserveTicket = (eventId, userId, quantity, unitPrice) =>
+export const reserveTicket = (eventId, userId, quantity, unitPrice, email) =>
   fetch(`${API_URL}/api/tickets/reserve`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ eventId, userId, quantity, unitPrice }),
+    body: JSON.stringify({ eventId, userId, quantity, unitPrice, email }),
   }).then(handleResponse);
 
 export const getUserReservations = (userId) =>
@@ -62,3 +80,13 @@ export const getUserReservations = (userId) =>
 
 export const getReservation = (id) =>
   fetch(`${API_URL}/api/tickets/${id}`, { headers: headers() }).then(handleResponse);
+
+// Admin
+export const getAllReservations = () =>
+  fetch(`${API_URL}/api/tickets`, { headers: headers() }).then(handleResponse);
+
+export const cancelReservation = (id) =>
+  fetch(`${API_URL}/api/tickets/${id}/cancel`, {
+    method: 'POST',
+    headers: headers(),
+  }).then(handleResponse);

@@ -1,0 +1,124 @@
+{
+  "$schema": "https://www.krakend.io/schema/v3.json",
+  "version": 3,
+  "name": "eventpass-gateway",
+  "port": 8080,
+  "timeout": "30s",
+  "cache_ttl": "0s",
+  "extra_config": {
+    "security/cors": {
+      "allow_origins": ["http://localhost:3000"],
+      "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      "allow_headers": ["Origin", "Authorization", "Content-Type", "Accept"],
+      "expose_headers": ["Content-Length"],
+      "allow_credentials": true,
+      "max_age": "12h"
+    },
+    "telemetry/metrics": {
+      "collection_time": "30s",
+      "listen_address": ":8090"
+    }
+  },
+  "endpoints": [
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/auth/login", "encoding": "no-op", "host": ["http://auth:8084"] }
+      ]
+    },
+    {
+      "endpoint": "/api/events",
+      "method": "GET",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/events", "encoding": "no-op", "host": ["http://catalog:8082"] }
+      ]
+    },
+    {
+      "endpoint": "/api/events/{id}",
+      "method": "GET",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/events/{id}", "encoding": "no-op", "host": ["http://catalog:8082"] }
+      ]
+    },
+    {
+      "endpoint": "/api/waiting-room/join",
+      "method": "POST",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/waiting-room/join", "encoding": "no-op", "host": ["http://waiting-room:8081"] }
+      ]
+    },
+    {
+      "endpoint": "/api/waiting-room/status",
+      "method": "GET",
+      "input_headers": ["*"],
+      "input_query_strings": ["eventId", "userId"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/waiting-room/status", "encoding": "no-op", "host": ["http://waiting-room:8081"] }
+      ]
+    },
+    {
+      "endpoint": "/api/tickets/reserve",
+      "method": "POST",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/tickets/reserve", "encoding": "no-op", "host": ["http://reservation:8083"] }
+      ]
+    },
+    {
+      "endpoint": "/api/tickets",
+      "method": "GET",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/tickets", "encoding": "no-op", "host": ["http://reservation:8083"] }
+      ]
+    },
+    {
+      "endpoint": "/api/tickets/{id}/cancel",
+      "method": "POST",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/tickets/{id}/cancel", "encoding": "no-op", "host": ["http://reservation:8083"] }
+      ]
+    },
+    {
+      "endpoint": "/api/tickets/user/{userId}",
+      "method": "GET",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/tickets/user/{userId}", "encoding": "no-op", "host": ["http://reservation:8083"] }
+      ]
+    },
+    {
+      "endpoint": "/api/tickets/user/{userId}/paid",
+      "method": "GET",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/tickets/user/{userId}/paid", "encoding": "no-op", "host": ["http://reservation:8083"] }
+      ]
+    },
+    {
+      "endpoint": "/api/tickets/{id}",
+      "method": "GET",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/tickets/{id}", "encoding": "no-op", "host": ["http://reservation:8083"] }
+      ]
+    }
+  ]
+}

@@ -51,19 +51,46 @@ function CheckoutPage() {
   const [error, setError] = useState('');
   const [step, setStep] = useState('checkout');
 
+  // Reservation countdown: the user has a limited window to complete the purchase.
+  const EXPIRY_SECONDS = 600; // 10 minutes
+  const [secondsLeft, setSecondsLeft] = useState(EXPIRY_SECONDS);
+  const [expired, setExpired] = useState(false);
+
   const token = getAuthToken();
-  const userId = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
+  const tokenPayload = token ? JSON.parse(atob(token.split('.')[1])) : {};
+  const userId = tokenPayload.sub || null;
+  const userEmail = tokenPayload.email || null;
 
   useEffect(() => {
     if (!token) { navigate('/login'); return; }
     if (!event) getEvent(eventId).then(setEvent).catch(() => {});
   }, [eventId]);
 
+  // Tick the countdown down once per second while reviewing/paying.
+  useEffect(() => {
+    if (step !== 'checkout' || expired) return;
+    const t = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          clearInterval(t);
+          setExpired(true);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [step, expired]);
+
+  const mmss = (s) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
   const handleReserve = async () => {
+    if (expired) return;
     setError('');
     setLoading(true);
     try {
-      const res = await reserveTicket(eventId, userId, quantity, event.price);
+      const res = await reserveTicket(eventId, userId, quantity, event.price, userEmail);
       setResult(res);
       setStep('processing');
       pollReservation(res.reservationId);
@@ -175,7 +202,8 @@ function CheckoutPage() {
 
           <div className="success-actions">
             <button className="btn btn-secondary">Descargar PDF</button>
-            <button className="btn btn-accent" onClick={() => navigate('/events')}>Volver al catálogo →</button>
+            <button className="btn btn-secondary" onClick={() => navigate('/events')}>Volver al catálogo</button>
+            <button className="btn btn-accent" onClick={() => navigate('/tickets')}>Ver mis entradas →</button>
           </div>
         </div>
       </div>
@@ -197,8 +225,10 @@ function CheckoutPage() {
 
           <div className="countdown-box">
             <span className="countdown-icon">⏳</span>
-            <div className="countdown-text">Tu reserva expira en <strong>10:00</strong></div>
-            <div className="countdown-bar"><div className="countdown-bar-fill" style={{ width: '99%' }} /></div>
+            <div className="countdown-text">Tu reserva expira en <strong>{mmss(secondsLeft)}</strong></div>
+            <div className="countdown-bar">
+              <div className="countdown-bar-fill" style={{ width: `${(secondsLeft / EXPIRY_SECONDS) * 100}%` }} />
+            </div>
           </div>
 
           <div className="checkout-section">
@@ -226,14 +256,33 @@ function CheckoutPage() {
 
           <div style={{ display: 'flex', gap: 12 }}>
             <button className="btn btn-secondary" onClick={() => navigate(`/events/${eventId}`)}>← Volver</button>
-            <button className="btn btn-accent btn-lg" style={{ flex: 1 }} onClick={handleReserve} disabled={loading || !event}>
-              {loading ? 'Procesando…' : `Confirmar y pagar ${formatPrice(total)} →`}
+            <button className="btn btn-accent btn-lg" style={{ flex: 1 }} onClick={handleReserve} disabled={loading || !event || expired}>
+              {loading ? 'Procesando…' : expired ? 'Tiempo agotado' : `Confirmar y pagar ${formatPrice(total)} →`}
             </button>
           </div>
         </div>
 
         <SummaryCard />
       </div>
+
+      {expired && (
+        <div className="qr-modal-bg">
+          <div className="qr-modal">
+            <div className="success-icon-wrap" style={{ background: 'var(--danger-bg)', margin: '0 auto 16px' }}>⏰</div>
+            <h3 style={{ fontSize: 18, fontWeight: 700 }}>Finalizó el tiempo de reserva</h3>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 8 }}>
+              Se agotó el tiempo para completar tu compra y tu reserva fue liberada.
+              Podés volver al evento e intentarlo nuevamente.
+            </p>
+            <button className="btn btn-accent btn-block" style={{ marginTop: 16 }} onClick={() => navigate(`/events/${eventId}`)}>
+              Volver al evento
+            </button>
+            <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={() => navigate('/events')}>
+              Ir al catálogo
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

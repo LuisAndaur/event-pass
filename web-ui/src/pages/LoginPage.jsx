@@ -17,7 +17,7 @@ function LoginPage() {
     try {
       const res = await login(email, password);
       setAuthToken(res.token);
-      navigate('/events');
+      navigate(res.role === 'ROLE_ADMIN' ? '/admin' : '/events');
     } catch (err) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {

@@ -25,6 +25,9 @@ public class Reservation {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
+    @Column(name = "user_email")
+    private String userEmail;
+
     @Column(nullable = false)
     private int quantity;
 
@@ -58,6 +61,9 @@ public class Reservation {
 
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
+
+    public String getUserEmail() { return userEmail; }
+    public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
 
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; }

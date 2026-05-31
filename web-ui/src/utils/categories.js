@@ -23,6 +23,19 @@ export const categoryStyle = (category) => {
   return CATEGORY_MAP[category.toLowerCase().trim()] || DEFAULT;
 };
 
+// Solid hex per imagery class — used as the wallet-ticket background.
+const IMG_HEX = {
+  'img-music': '#6366F1',
+  'img-sport': '#10B981',
+  'img-edu': '#F59E0B',
+  'img-family': '#EC4899',
+  'img-tech': '#3B82F6',
+  'img-art': '#06B6D4',
+  'img-concert': '#8B5CF6',
+};
+
+export const categoryHex = (category) => IMG_HEX[categoryStyle(category).img] || '#1C1F26';
+
 export const formatPrice = (price) => {
   if (price == null) return '';
   const n = Number(price);

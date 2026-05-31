@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isAdmin } from '../services/api';
 
 // Derives initials for the avatar from the JWT (email claim) when available.
 const getInitials = () => {
@@ -15,7 +16,7 @@ const getInitials = () => {
   }
 };
 
-function Topbar({ showNav = true, onLogout, extra }) {
+function Topbar({ showNav = true, active = 'descubrir', onLogout, extra }) {
   const navigate = useNavigate();
   const initials = getInitials();
 
@@ -27,7 +28,11 @@ function Topbar({ showNav = true, onLogout, extra }) {
         </div>
         {showNav && (
           <nav className="app-nav">
-            <a className="active" onClick={() => navigate('/events')}>Descubrir</a>
+            <a className={active === 'descubrir' ? 'active' : ''} onClick={() => navigate('/events')}>Descubrir</a>
+            <a className={active === 'tickets' ? 'active' : ''} onClick={() => navigate('/tickets')}>Mis entradas</a>
+            {isAdmin() && (
+              <a className={active === 'admin' ? 'active' : ''} onClick={() => navigate('/admin')}>Admin</a>
+            )}
           </nav>
         )}
       </div>

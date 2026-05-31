@@ -25,6 +25,7 @@ public class ReservationController {
         try {
             String eventId = (String) body.get("eventId");
             String userId = (String) body.get("userId");
+            String email = (String) body.get("email");
             int quantity = (int) body.get("quantity");
             BigDecimal unitPrice = new BigDecimal(body.get("unitPrice").toString());
 
@@ -32,7 +33,7 @@ public class ReservationController {
                 return ResponseEntity.badRequest().body(Map.of("error", "eventId and userId required"));
             }
 
-            Reservation reservation = service.reserveTicket(eventId, userId, quantity, unitPrice);
+            Reservation reservation = service.reserveTicket(eventId, userId, email, quantity, unitPrice);
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
                     "reservationId", reservation.getId(),
                     "status", reservation.getStatus().toString(),
@@ -41,6 +42,23 @@ public class ReservationController {
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Reservation>> getAllReservations() {
+        return ResponseEntity.ok(service.getAllReservations());
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<?> cancelReservation(@PathVariable String id) {
+        Reservation reservation = service.cancelReservation(id);
+        if (reservation == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(Map.of(
+                "id", reservation.getId(),
+                "status", reservation.getStatus().toString()
+        ));
     }
 
     @GetMapping("/user/{userId}")

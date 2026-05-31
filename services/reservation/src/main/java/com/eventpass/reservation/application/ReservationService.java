@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -32,7 +33,7 @@ public class ReservationService {
     }
 
     @Transactional
-    public Reservation reserveTicket(String eventId, String userId, int quantity, BigDecimal unitPrice) {
+    public Reservation reserveTicket(String eventId, String userId, String userEmail, int quantity, BigDecimal unitPrice) {
         // Pessimistic Lock: SELECT ... FOR UPDATE
         // If inventory doesn't exist yet (first request for this event), create it with default stock
         InventoryEntity inventory = inventoryRepo.findByIdWithPessimisticLock(eventId)
@@ -53,6 +54,7 @@ public class ReservationService {
         // Create reservation
         BigDecimal total = unitPrice.multiply(BigDecimal.valueOf(quantity));
         Reservation reservation = new Reservation(eventId, userId, quantity, total);
+        reservation.setUserEmail(userEmail);
         reservation = reservationRepo.save(reservation);
 
         log.info("Reservation created: id={}, event={}, user={}, qty={}, total={}",
@@ -68,6 +70,36 @@ public class ReservationService {
 
     public List<Reservation> getUserReservations(String userId) {
         return reservationRepo.findByUserId(userId);
+    }
+
+    public List<Reservation> getAllReservations() {
+        return reservationRepo.findAllByOrderByCreatedAtDesc();
+    }
+
+    /**
+     * Cancels a reservation and returns its quantity to the event inventory.
+     * Idempotent: cancelling an already-cancelled reservation is a no-op.
+     */
+    @Transactional
+    public Reservation cancelReservation(String id) {
+        Reservation reservation = reservationRepo.findById(id).orElse(null);
+        if (reservation == null) return null;
+        if (reservation.getStatus() == Reservation.Status.CANCELLED) return reservation;
+
+        // Return the seats to the inventory under a pessimistic lock.
+        inventoryRepo.findByIdWithPessimisticLock(reservation.getEventId()).ifPresent(inv -> {
+            inv.setAvailableStock(inv.getAvailableStock() + reservation.getQuantity());
+            inventoryRepo.save(inv);
+        });
+
+        reservation.setStatus(Reservation.Status.CANCELLED);
+        reservation.setUpdatedAt(LocalDateTime.now());
+        Reservation saved = reservationRepo.save(reservation);
+
+        log.info("Reservation cancelled: id={}, event={}, qty restored={}",
+                saved.getId(), saved.getEventId(), saved.getQuantity());
+
+        return saved;
     }
 
     public List<Reservation> getUserPaidReservations(String userId) {
