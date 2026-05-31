@@ -34,9 +34,14 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  // Admin account: the only user allowed into the admin module.
-  const isAdmin = email.toLowerCase() === 'admin@admin.com';
-  const expectedPassword = isAdmin ? '123456' : 'pass123';
+  const normalizedEmail = email.toLowerCase();
+
+  // Special accounts with their own module access.
+  const isAdmin = normalizedEmail === 'admin@admin.com';
+  const isOrganizer = normalizedEmail === 'organizador@organizador.com';
+
+  // admin and organizer use 123456; regular assistants use pass123.
+  const expectedPassword = (isAdmin || isOrganizer) ? '123456' : 'pass123';
 
   // Mock auth — in production this would validate against a user service.
   if (password !== expectedPassword) {
@@ -44,9 +49,9 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const userId = String(javaHashCode(email));
-  const role = isAdmin
-    ? 'ROLE_ADMIN'
-    : email.includes('organizer') ? 'ROLE_ORGANIZADOR' : 'ROLE_ASISTENTE';
+  let role = 'ROLE_ASISTENTE';
+  if (isAdmin) role = 'ROLE_ADMIN';
+  else if (isOrganizer || email.includes('organizer')) role = 'ROLE_ORGANIZADOR';
 
   const token = jwt.sign({ email, role }, JWT_SECRET, {
     algorithm: 'HS256',

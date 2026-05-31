@@ -11,6 +11,11 @@ import AdminTickets from './pages/admin/AdminTickets';
 import AdminUsuarios from './pages/admin/AdminUsuarios';
 import AdminEventos from './pages/admin/AdminEventos';
 import AdminMetricas from './pages/admin/AdminMetricas';
+import OrgDashboard from './pages/org/OrgDashboard';
+import OrgCreateEvent from './pages/org/OrgCreateEvent';
+import OrgTickets from './pages/org/OrgTickets';
+import OrgMetricas from './pages/org/OrgMetricas';
+import OrgScanner from './pages/org/OrgScanner';
 
 function App() {
   return (
@@ -26,6 +31,11 @@ function App() {
       <Route path="/admin/usuarios" element={<AdminUsuarios />} />
       <Route path="/admin/eventos" element={<AdminEventos />} />
       <Route path="/admin/metricas" element={<AdminMetricas />} />
+      <Route path="/org" element={<OrgDashboard />} />
+      <Route path="/org/crear" element={<OrgCreateEvent />} />
+      <Route path="/org/tickets" element={<OrgTickets />} />
+      <Route path="/org/metricas" element={<OrgMetricas />} />
+      <Route path="/org/scanner" element={<OrgScanner />} />
       <Route path="*" element={<Navigate to="/events" replace />} />
     </Routes>
   );

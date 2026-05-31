@@ -14,9 +14,23 @@
       "allow_credentials": true,
       "max_age": "12h"
     },
-    "telemetry/metrics": {
-      "collection_time": "30s",
-      "listen_address": ":8090"
+    "telemetry/opencensus": {
+      "sample_rate": 100,
+      "reporting_period": 1,
+      "enabled_layers": {
+        "router": true,
+        "backend": true
+      },
+      "exporters": {
+        "prometheus": {
+          "port": 9091,
+          "namespace": "krakend",
+          "tag_host": false,
+          "tag_path": true,
+          "tag_method": true,
+          "tag_statuscode": true
+        }
+      }
     }
   },
   "endpoints": [
@@ -41,6 +55,24 @@
     {
       "endpoint": "/api/events/{id}",
       "method": "GET",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/events/{id}", "encoding": "no-op", "host": ["http://catalog:8082"] }
+      ]
+    },
+    {
+      "endpoint": "/api/events",
+      "method": "POST",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        { "url_pattern": "/api/events", "encoding": "no-op", "host": ["http://catalog:8082"] }
+      ]
+    },
+    {
+      "endpoint": "/api/events/{id}",
+      "method": "PUT",
       "input_headers": ["*"],
       "output_encoding": "no-op",
       "backend": [

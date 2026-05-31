@@ -1,70 +1,203 @@
 {
   "__inputs": [],
-  "__elements": {},
   "__requires": [],
+  "uid": "eventpass-overview",
   "title": "EventPass — Overview",
-  "description": "Monitoreo general del sistema de eventos",
-  "version": 1,
-  "timezone": "browser",
+  "description": "Monitoreo de todos los componentes: API Gateway (KrakenD) y microservicios Spring Boot",
+  "tags": ["eventpass"],
+  "schemaVersion": 39,
+  "version": 2,
   "editable": true,
-  "gnetId": null,
-  "graphTooltip": 0,
+  "timezone": "browser",
+  "graphTooltip": 1,
+  "time": { "from": "now-30m", "to": "now" },
+  "refresh": "10s",
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
   "panels": [
     {
-      "title": "Health Status",
+      "id": 1,
+      "type": "row",
+      "title": "Resumen",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
       "type": "stat",
+      "title": "Componentes activos",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 6, "w": 4, "x": 0, "y": 0 },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
       "targets": [
-        {
-          "expr": "up{job=~\"gateway|waiting-room|catalog|reservation\"}",
-          "legendFormat": "{{job}}"
-        }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "up{job=~\"gateway|waiting-room|catalog|reservation\"}", "legendFormat": "{{job}}", "instant": true }
       ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "horizontal",
+        "colorMode": "background",
+        "textMode": "value_and_name",
+        "graphMode": "none"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": { "steps": [{ "value": 0, "color": "red" }, { "value": 1, "color": "green" }] }
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "red" }, { "value": 1, "color": "green" } ] }
         }
       }
     },
     {
-      "title": "HTTP Requests / sec",
-      "type": "graph",
+      "id": 3,
+      "type": "stat",
+      "title": "Gateway · throughput (req/s)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 4, "y": 0 },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
       "targets": [
-        {
-          "expr": "rate(http_server_requests_seconds_count[1m])",
-          "legendFormat": "{{service}} - {{method}}"
-        }
-      ]
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(krakend_opencensus_io_http_server_request_count[1m]))", "instant": true }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2, "color": { "mode": "fixed", "fixedColor": "blue" } } }
     },
     {
-      "title": "JVM Memory Usage",
-      "type": "graph",
+      "id": 4,
+      "type": "stat",
+      "title": "Gateway · latencia p95 (ms)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 12, "y": 0 },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
       "targets": [
-        {
-          "expr": "jvm_memory_used_bytes{area=\"heap\"} / 1024 / 1024",
-          "legendFormat": "{{service}} heap (MB)"
-        }
-      ]
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.95, sum by (le) (rate(krakend_opencensus_io_http_server_latency_bucket[5m])))", "instant": true }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1, "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 200, "color": "yellow" }, { "value": 500, "color": "red" } ] }, "color": { "mode": "thresholds" } } }
     },
     {
-      "title": "HTTP Error Rate (4xx/5xx)",
-      "type": "graph",
+      "id": 5,
+      "type": "stat",
+      "title": "Gateway · errores 5xx (req/s)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
       "targets": [
-        {
-          "expr": "rate(http_server_requests_seconds_count{status=~\"4..|5..\"}[1m])",
-          "legendFormat": "{{service}} - {{status}}"
-        }
-      ]
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(krakend_opencensus_io_http_server_response_count_by_status_code{http_status=~\"5..\"}[1m]))", "instant": true }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2, "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "green" }, { "value": 0.001, "color": "red" } ] }, "color": { "mode": "thresholds" } } }
+    },
+
+    {
+      "id": 10,
+      "type": "row",
+      "title": "API Gateway (KrakenD)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Gateway · peticiones por endpoint y status (req/s)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (http_path, http_status) (rate(krakend_opencensus_io_http_server_response_count_by_status_code[1m]))", "legendFormat": "{{http_path}} [{{http_status}}]" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" } } },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "lastNotNull"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Gateway · latencia p95 por endpoint (ms)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "histogram_quantile(0.95, sum by (http_path, le) (rate(krakend_opencensus_io_http_server_latency_bucket[5m])))", "legendFormat": "{{http_path}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" } } },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } }
+    },
+
+    {
+      "id": 20,
+      "type": "row",
+      "title": "Microservicios (Spring Boot)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Peticiones por servicio (req/s)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 17 },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (application) (rate(http_server_requests_seconds_count[1m]))", "legendFormat": "{{application}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Latencia media por servicio (ms)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 17 },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "(sum by (application) (rate(http_server_requests_seconds_sum[5m])) / sum by (application) (rate(http_server_requests_seconds_count[5m]))) * 1000", "legendFormat": "{{application}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Errores 4xx/5xx por servicio (req/s)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 17 },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (application, status) (rate(http_server_requests_seconds_count{status=~\"4..|5..\"}[1m]))", "legendFormat": "{{application}} [{{status}}]" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+
+    {
+      "id": 30,
+      "type": "row",
+      "title": "Recursos JVM",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Memoria heap usada por servicio",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (application) (jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "{{application}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Uso de CPU del proceso (%)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "process_cpu_usage{application=~\"eventpass-.*\"} * 100", "legendFormat": "{{application}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 33,
+      "type": "timeseries",
+      "title": "Threads vivos por servicio",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "jvm_threads_live_threads{application=~\"eventpass-.*\"}", "legendFormat": "{{application}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "showPoints": "never" } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
     }
-  ],
-  "schemaVersion": 38,
-  "time": { "from": "now-15m", "to": "now" }
+  ]
 }

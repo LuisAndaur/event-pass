@@ -27,6 +27,7 @@ export const getUserInfo = () => {
 };
 
 export const isAdmin = () => getUserInfo()?.role === 'ROLE_ADMIN';
+export const isOrganizer = () => getUserInfo()?.role === 'ROLE_ORGANIZADOR';
 
 const headers = () => ({
   'Content-Type': 'application/json',
@@ -53,6 +54,13 @@ export const getEvents = () =>
 
 export const getEvent = (id) =>
   fetch(`${API_URL}/api/events/${id}`, { headers: headers() }).then(handleResponse);
+
+export const createEvent = (event) =>
+  fetch(`${API_URL}/api/events`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(event),
+  }).then(handleResponse);
 
 // Waiting Room
 export const joinQueue = (eventId, userId) =>

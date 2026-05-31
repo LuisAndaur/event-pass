@@ -78,10 +78,13 @@ docker compose up --build
 | Tipo de usuario | Email | Contraseña | Acceso |
 |-----------------|-------|------------|--------|
 | Asistente | cualquier email | `pass123` | Catálogo, reservas, mis entradas |
+| Organizador | `organizador@organizador.com` | `123456` | Panel del organizador |
 | Administrador | `admin@admin.com` | `123456` | Panel de administración |
 
 > Es una autenticación mock para la demo: cualquier email con `pass123` entra como asistente.
-> El único usuario con acceso al panel de administración es `admin@admin.com`.
+> El acceso al panel de organizador está reservado a `organizador@organizador.com` y el del
+> panel de administración a `admin@admin.com`. Según el rol, el login redirige automáticamente
+> a `/events` (asistente), `/org` (organizador) o `/admin` (administrador).
 
 ### Servicios y puertos
 | Servicio | Puerto | Descripción |
@@ -113,6 +116,18 @@ docker compose up --build
 - **Mis entradas**: tickets agrupados por estado — Compradas (`PAID`), Pendientes
   (`PENDING_PAYMENT`) y Rechazadas (`FAILED`/`CANCELLED`), con QR por entrada.
 
+### Organizador (`organizador@organizador.com`)
+- **Dashboard**: saludo, KPIs (próximo evento, entradas vendidas, ingresos, eventos activos),
+  mix por categoría y tabla "Mis eventos" con ventas.
+- **Crear evento**: asistente (wizard) de 3 pasos — información básica → fecha y lugar →
+  entrada y publicación — que **crea el evento real** en el catálogo (`POST /api/events`).
+- **Tickets**: tabla de tickets vendidos con filtros por evento y estado, búsqueda y
+  **exportación a CSV**.
+- **Métricas**: entradas vendidas, ingresos, conversión, cancelaciones, mix por categoría y
+  embudo de conversión.
+- **Escáner de acceso**: maqueta visual de control de acceso por QR (sin backend de check-in;
+  los check-ins se simulan a partir de reservas confirmadas).
+
 ### Administración (`admin@admin.com`)
 - **Dashboard**: KPIs agregados (eventos, entradas vendidas, ingresos), top categorías y
   reservas recientes.
@@ -128,6 +143,8 @@ docker compose up --build
 | POST | `/api/auth/login` | Auth | Login, devuelve JWT |
 | GET | `/api/events` | Catalog | Lista de eventos |
 | GET | `/api/events/{id}` | Catalog | Detalle de evento |
+| POST | `/api/events` | Catalog | Crear evento (organizador) |
+| PUT | `/api/events/{id}` | Catalog | Editar evento (organizador) |
 | POST | `/api/waiting-room/join` | Waiting Room | Unirse a la fila |
 | GET | `/api/waiting-room/status` | Waiting Room | Posición en la fila |
 | POST | `/api/tickets/reserve` | Reservation | Crear reserva |
@@ -162,6 +179,9 @@ event-pass/
   se requiere.)
 - **SSE**: KrakenD no hace streaming de server-sent events, por lo que la sala de espera se
   actualiza mediante polling periódico (el código SSE queda como best-effort).
+- **Inventario**: el Catalog Service y el Reservation Service mantienen inventarios separados.
+  Un evento creado por el organizador nace con el stock del catálogo, pero el Reservation
+  Service crea su propio inventario (con un valor por defecto) en la primera reserva.
 - Los workers de **Payment** y **Notification** están mockeados (embebidos en Reservation Service).
 - ELK Stack y OpenTelemetry están comentados en `docker-compose.yml`, listos para activar.
 - Cada servicio Java usa multi-stage Docker build (Maven → JRE) para imágenes optimizadas.

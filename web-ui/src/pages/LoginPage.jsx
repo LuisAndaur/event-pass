@@ -17,7 +17,10 @@ function LoginPage() {
     try {
       const res = await login(email, password);
       setAuthToken(res.token);
-      navigate(res.role === 'ROLE_ADMIN' ? '/admin' : '/events');
+      const dest = res.role === 'ROLE_ADMIN' ? '/admin'
+        : res.role === 'ROLE_ORGANIZADOR' ? '/org'
+        : '/events';
+      navigate(dest);
     } catch (err) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {
