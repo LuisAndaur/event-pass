@@ -77,10 +77,11 @@ services:
       MYSQL_USER: ${MYSQL_CATALOG_USER}
       MYSQL_PASSWORD: ${MYSQL_CATALOG_PASSWORD}
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysql", "-u${MYSQL_CATALOG_USER}", "-p${MYSQL_CATALOG_PASSWORD}", "-e", "SELECT 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   mysql-reservation:
     image: mysql:8.0
@@ -94,10 +95,11 @@ services:
       MYSQL_USER: ${MYSQL_RESERVATION_USER}
       MYSQL_PASSWORD: ${MYSQL_RESERVATION_PASSWORD}
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysql", "-u${MYSQL_RESERVATION_USER}", "-p${MYSQL_RESERVATION_PASSWORD}", "-e", "SELECT 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   # ============================================
   # OBSERVABILIDAD
@@ -144,6 +146,7 @@ services:
       context: ./gateway
       dockerfile: Dockerfile
     container_name: eventpass-gateway
+    restart: on-failure
     networks: [event-pass-net]
     ports: ["${GATEWAY_PORT}:8080"]
     environment:
@@ -162,6 +165,7 @@ services:
       context: ./services/waiting-room
       dockerfile: Dockerfile
     container_name: eventpass-waiting-room
+    restart: on-failure
     networks: [event-pass-net]
     ports: ["8081:8081"]
     environment:
@@ -178,6 +182,7 @@ services:
       context: ./services/catalog
       dockerfile: Dockerfile
     container_name: eventpass-catalog
+    restart: on-failure
     networks: [event-pass-net]
     ports: ["8082:8082"]
     environment:
@@ -198,6 +203,7 @@ services:
       context: ./services/reservation
       dockerfile: Dockerfile
     container_name: eventpass-reservation
+    restart: on-failure
     networks: [event-pass-net]
     ports: ["8083:8083"]
     environment:
