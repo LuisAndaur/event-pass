@@ -1,8 +1,68 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const swaggerUi = require('swagger-ui-express');
 
 const app = express();
 app.use(express.json());
+
+// OpenAPI spec for the auth service, served as Swagger UI at /docs.
+const openApiSpec = {
+  openapi: '3.0.0',
+  info: {
+    title: 'EventPass — Auth API',
+    description: 'Servicio de autenticación: emite el JWT del login.',
+    version: '1.0.0',
+  },
+  paths: {
+    '/api/auth/login': {
+      post: {
+        summary: 'Iniciar sesión y obtener un JWT',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email', 'password'],
+                properties: {
+                  email: { type: 'string', example: 'admin@admin.com' },
+                  password: { type: 'string', example: '123456' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Login correcto',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    token: { type: 'string' },
+                    userId: { type: 'string' },
+                    email: { type: 'string' },
+                    role: { type: 'string', example: 'ROLE_ADMIN' },
+                    expiresIn: { type: 'integer' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Faltan email o password' },
+          401: { description: 'Credenciales inválidas' },
+        },
+      },
+    },
+    '/health': {
+      get: { summary: 'Health check', responses: { 200: { description: 'OK' } } },
+    },
+  },
+};
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+app.get('/v3/api-docs', (_req, res) => res.json(openApiSpec));
 
 const PORT = process.env.PORT || 8084;
 const JWT_SECRET = process.env.JWT_SECRET;

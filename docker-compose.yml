@@ -163,6 +163,7 @@ services:
     container_name: eventpass-auth
     restart: on-failure
     networks: [event-pass-net]
+    ports: ["8084:8084"]
     environment:
       PORT: 8084
       JWT_SECRET: ${JWT_SECRET}
