@@ -8,17 +8,28 @@ scrape_configs:
     static_configs:
       - targets: ["gateway:9091"]
 
+  # The API services are scaled horizontally; DNS service discovery resolves
+  # the Compose service name to every replica's IP so all of them are scraped.
   - job_name: "waiting-room"
     metrics_path: /actuator/prometheus
-    static_configs:
-      - targets: ["waiting-room:8081"]
+    dns_sd_configs:
+      - names: ["waiting-room"]
+        type: A
+        port: 8081
+        refresh_interval: 15s
 
   - job_name: "catalog"
     metrics_path: /actuator/prometheus
-    static_configs:
-      - targets: ["catalog:8082"]
+    dns_sd_configs:
+      - names: ["catalog"]
+        type: A
+        port: 8082
+        refresh_interval: 15s
 
   - job_name: "reservation"
     metrics_path: /actuator/prometheus
-    static_configs:
-      - targets: ["reservation:8083"]
+    dns_sd_configs:
+      - names: ["reservation"]
+        type: A
+        port: 8083
+        refresh_interval: 15s

@@ -19,6 +19,7 @@ public class QueueService {
 
     private static final String QUEUE_KEY_PREFIX = "queue:event:";
     private static final String PASS_TOKEN_PREFIX = "passtoken:";
+    private static final String DRIP_LOCK_KEY = "lock:queue:dripfeed";
 
     private final StringRedisTemplate redis;
     private final SecretKey secretKey;
@@ -70,6 +71,14 @@ public class QueueService {
      */
     @Scheduled(fixedDelay = 10000)
     public void processQueue() {
+        // Single-flight across replicas: only the instance that acquires the
+        // Redis lock runs the drip-feed this tick. The lock auto-expires (9s)
+        // so the next tick is open to any replica. This keeps the throttle rate
+        // constant regardless of how many waiting-room replicas are running.
+        Boolean acquired = redis.opsForValue()
+                .setIfAbsent(DRIP_LOCK_KEY, "1", java.time.Duration.ofSeconds(9));
+        if (!Boolean.TRUE.equals(acquired)) return;
+
         Set<String> keys = redis.keys(QUEUE_KEY_PREFIX + "*");
         if (keys == null) return;
 

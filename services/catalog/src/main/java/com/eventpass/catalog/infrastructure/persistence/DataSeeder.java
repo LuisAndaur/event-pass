@@ -1,23 +1,68 @@
 package com.eventpass.catalog.infrastructure.persistence;
 
 import com.eventpass.catalog.domain.Event;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.LocalDateTime;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
 
-    private final EventRepository repository;
+    private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
+    private static final String SEED_LOCK = "catalog_seed_lock";
 
-    public DataSeeder(EventRepository repository) {
+    private final EventRepository repository;
+    private final DataSource dataSource;
+
+    public DataSeeder(EventRepository repository, DataSource dataSource) {
         this.repository = repository;
+        this.dataSource = dataSource;
     }
 
     @Override
     public void run(String... args) {
+        // With horizontally-scaled replicas, several catalog instances boot at once.
+        // A MySQL advisory lock (GET_LOCK) held on a dedicated connection serializes
+        // the seeding: the first replica seeds and commits, the rest wait, then see
+        // count > 0 and skip. This prevents duplicate seed rows on a fresh database.
+        try (Connection conn = dataSource.getConnection()) {
+            if (!acquireLock(conn)) {
+                log.warn("Could not acquire seed lock; skipping seeding on this instance.");
+                return;
+            }
+            try {
+                seedIfEmpty();
+            } finally {
+                releaseLock(conn);
+            }
+        } catch (Exception e) {
+            log.error("DataSeeder failed: {}", e.getMessage(), e);
+        }
+    }
+
+    private boolean acquireLock(Connection conn) throws Exception {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT GET_LOCK(?, 15)")) {
+            ps.setString(1, SEED_LOCK);
+            var rs = ps.executeQuery();
+            return rs.next() && rs.getInt(1) == 1;
+        }
+    }
+
+    private void releaseLock(Connection conn) throws Exception {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT RELEASE_LOCK(?)")) {
+            ps.setString(1, SEED_LOCK);
+            ps.executeQuery();
+        }
+    }
+
+    private void seedIfEmpty() {
         if (repository.count() > 0) return;
 
         repository.save(new Event(
@@ -86,6 +131,6 @@ public class DataSeeder implements CommandLineRunner {
                 "https://images.unsplash.com/photo-1503095396549-807759245b35?w=800"
         ));
 
-        System.out.println("✓ Catalog seeded with sample events");
+        log.info("✓ Catalog seeded with sample events");
     }
 }

@@ -160,40 +160,48 @@ services:
     build:
       context: ./services/auth
       dockerfile: Dockerfile
-    container_name: eventpass-auth
     restart: on-failure
     networks: [event-pass-net]
-    ports: ["8084:8084"]
+    ports: ["8084"]
     environment:
       PORT: 8084
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS}
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 128M
 
   waiting-room:
     build:
       context: ./services/waiting-room
       dockerfile: Dockerfile
-    container_name: eventpass-waiting-room
     restart: on-failure
     networks: [event-pass-net]
-    ports: ["8081:8081"]
+    ports: ["8081"]
     environment:
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS}
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"
     depends_on:
       redis:
         condition: service_healthy
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 384M
 
   catalog:
     build:
       context: ./services/catalog
       dockerfile: Dockerfile
-    container_name: eventpass-catalog
     restart: on-failure
     networks: [event-pass-net]
-    ports: ["8082:8082"]
+    ports: ["8082"]
     environment:
       MYSQL_HOST: mysql-catalog
       MYSQL_DATABASE: ${MYSQL_CATALOG_DATABASE}
@@ -201,20 +209,25 @@ services:
       MYSQL_PASSWORD: ${MYSQL_CATALOG_PASSWORD}
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"
     depends_on:
       mysql-catalog:
         condition: service_healthy
       redis:
         condition: service_healthy
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 384M
 
   reservation:
     build:
       context: ./services/reservation
       dockerfile: Dockerfile
-    container_name: eventpass-reservation
     restart: on-failure
     networks: [event-pass-net]
-    ports: ["8083:8083"]
+    ports: ["8083"]
     environment:
       MYSQL_HOST: mysql-reservation
       MYSQL_DATABASE: ${MYSQL_RESERVATION_DATABASE}
@@ -222,11 +235,17 @@ services:
       MYSQL_PASSWORD: ${MYSQL_RESERVATION_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_SECRET: ${JWT_SECRET}
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"
     depends_on:
       mysql-reservation:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 384M
 
   # ============================================
   # WEB UI

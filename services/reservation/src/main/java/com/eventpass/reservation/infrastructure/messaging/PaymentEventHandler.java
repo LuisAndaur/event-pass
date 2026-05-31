@@ -37,6 +37,15 @@ public class PaymentEventHandler {
             return;
         }
 
+        // Idempotency guard: with horizontally-scaled replicas the MockPaymentWorker
+        // may emit duplicate payment events. Only the first one (while the reservation
+        // is still PENDING_PAYMENT) is applied; duplicates are ignored safely.
+        if (reservation.getStatus() != Reservation.Status.PENDING_PAYMENT) {
+            log.info("Ignoring payment event for reservation {} already resolved as {}",
+                    reservation.getId(), reservation.getStatus());
+            return;
+        }
+
         if (event.getStatus() == PaymentEvent.PaymentStatus.APPROVED) {
             reservation.setStatus(Reservation.Status.PAID);
             reservation.setUpdatedAt(java.time.LocalDateTime.now());
