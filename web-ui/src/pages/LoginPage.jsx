@@ -27,30 +27,41 @@ function LoginPage() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <h1>🎫 EventPass</h1>
-        <p>Sistema de Gestión de Eventos y Entradas</p>
+      <div className="auth-aside">
+        <div className="brand"><span className="brand-mark">EP</span>EventPass</div>
+        <div>
+          <p className="auth-quote">
+            "Cualquier idea puede convertirse en un evento. Cualquier evento puede llenar una sala."
+          </p>
+          <p className="auth-quote-author">— Equipo de plataforma</p>
+        </div>
+        <p className="auth-foot">© 2026 EventPass · Todos los derechos reservados</p>
+      </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
+      <div className="auth-main">
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <h2>Bienvenido de vuelta</h2>
+          <p className="sub">Inicia sesión para continuar donde lo dejaste.</p>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Email</label>
+          {error && <div className="alert alert-error">{error}</div>}
+
+          <div className="field">
+            <label>Correo electrónico</label>
             <input
+              className="input"
               type="email"
-              className="form-input"
-              placeholder="ej: usuario@email.com"
+              placeholder="tucorreo@ejemplo.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
 
-          <div className="form-group">
+          <div className="field">
             <label>Contraseña</label>
             <input
+              className="input"
               type="password"
-              className="form-input"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -58,19 +69,19 @@ function LoginPage() {
             />
           </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary btn-lg"
-            style={{ width: '100%', marginTop: '1rem' }}
-            disabled={loading}
-          >
-            {loading ? 'Ingresando...' : 'Ingresar'}
-          </button>
-        </form>
+          <div className="row-between" style={{ marginBottom: 24 }}>
+            <label className="checkbox"><input type="checkbox" defaultChecked /> Recordarme</label>
+            <a className="link">¿Olvidaste tu contraseña?</a>
+          </div>
 
-        <p style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>
-          <strong>Demo:</strong> cualquier email con contraseña <code>pass123</code>
-        </p>
+          <button type="submit" className="btn btn-accent btn-block btn-lg" disabled={loading}>
+            {loading ? 'Ingresando…' : 'Iniciar sesión'}
+          </button>
+
+          <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--text-secondary)' }}>
+            <strong>Demo:</strong> cualquier email con contraseña <code>pass123</code>
+          </p>
+        </form>
       </div>
     </div>
   );

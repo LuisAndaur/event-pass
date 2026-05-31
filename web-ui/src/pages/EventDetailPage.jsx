@@ -1,101 +1,155 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getEvent, getAuthToken } from '../services/api';
+import Topbar from '../components/Topbar';
+import { categoryStyle, formatPrice, formatDate } from '../utils/categories';
 
 function EventDetailPage() {
   const { id } = useParams();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [qty, setQty] = useState(1);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!getAuthToken()) { navigate('/login'); return; }
-
     getEvent(id)
       .then(setEvent)
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [id]);
 
-  const formatDate = (dateStr) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('es-AR', {
-      day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-  };
-
   if (loading) {
     return (
-      <div className="container event-detail">
-        <div className="skeleton" style={{ height: '400px', borderRadius: '12px', marginBottom: '2rem' }} />
-        <div className="skeleton skeleton-line" /><div className="skeleton skeleton-line short" />
+      <div>
+        <Topbar />
+        <div className="skeleton" style={{ height: 300 }} />
+        <div className="event-detail-body">
+          <div>
+            <div className="skeleton skeleton-line" style={{ width: '60%', height: 28 }} />
+            <div className="skeleton skeleton-line" />
+            <div className="skeleton skeleton-line short" />
+          </div>
+          <div className="skeleton" style={{ height: 320, borderRadius: 'var(--radius-lg)' }} />
+        </div>
       </div>
     );
   }
 
   if (!event) {
     return (
-      <div className="container" style={{ textAlign: 'center', marginTop: '4rem' }}>
-        <h2>Evento no encontrado</h2>
-        <Link to="/events" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-          Volver al catálogo
-        </Link>
+      <div>
+        <Topbar />
+        <div style={{ textAlign: 'center', marginTop: '4rem' }}>
+          <h2>Evento no encontrado</h2>
+          <button className="btn btn-accent" style={{ marginTop: 16 }} onClick={() => navigate('/events')}>
+            Volver al catálogo
+          </button>
+        </div>
       </div>
     );
   }
 
+  const cat = categoryStyle(event.category);
+  const soldOut = event.availableStock <= 0;
+  const sold = event.totalCapacity - event.availableStock;
+  const soldPct = event.totalCapacity > 0 ? Math.round((sold / event.totalCapacity) * 100) : 0;
+  const total = event.price * qty;
+  const maxQty = Math.min(10, event.availableStock || 0);
+  const coverBg = event.imageUrl ? { backgroundImage: `url(${event.imageUrl})` } : undefined;
+
   return (
     <div>
-      <nav className="navbar">
-        <Link to="/events" className="navbar-brand">🎫 <span>EventPass</span></Link>
-        <div className="navbar-actions">
-          <Link to="/events" className="btn btn-secondary btn-sm">← Volver</Link>
-        </div>
-      </nav>
+      <Topbar />
 
-      <div className="container event-detail">
-        <img
-          src={event.imageUrl || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800'}
-          alt={event.title}
-          className="event-detail-img"
-        />
-
-        <h1>{event.title}</h1>
-        <span className="tag" style={{ marginTop: '0.5rem', display: 'inline-block' }}>
-          {event.category}
-        </span>
-
-        <div className="event-meta">
-          <div className="event-meta-item">
-            <span className="event-meta-label">📅 Fecha</span>
-            <span className="event-meta-value">{formatDate(event.date)}</span>
-          </div>
-          <div className="event-meta-item">
-            <span className="event-meta-label">📍 Lugar</span>
-            <span className="event-meta-value">{event.venue}</span>
-          </div>
-          <div className="event-meta-item">
-            <span className="event-meta-label">🎟️ Disponibles</span>
-            <span className="event-meta-value">{event.availableStock} de {event.totalCapacity}</span>
-          </div>
-          <div className="event-meta-item">
-            <span className="event-meta-label">💰 Precio</span>
-            <span className="event-meta-value price">${event.price?.toLocaleString('es-AR')}</span>
+      {/* Cover */}
+      <div className={`event-detail-cover ${event.imageUrl ? '' : cat.img}`} style={coverBg}>
+        <div className="event-detail-cover-overlay" />
+        <div className="event-detail-cover-body">
+          <span className="cover-back" onClick={() => navigate('/events')}>← Volver al catálogo</span>
+          <h1>{event.title}</h1>
+          <div className="cover-meta">
+            <span>{formatDate(event.date)}</span>
+            <span>{event.venue}</span>
+            <span><span className={`badge ${cat.badge}`}>{event.category}</span></span>
           </div>
         </div>
+      </div>
 
-        <p style={{ lineHeight: 1.8, color: 'var(--text-muted)', marginBottom: '2rem' }}>
-          {event.description}
-        </p>
+      <div className="event-detail-body">
+        <div className="event-detail-main">
+          <div className="detail-actions">
+            <button className="btn btn-ghost btn-sm">♡ Guardar</button>
+            <button className="btn btn-ghost btn-sm">Compartir</button>
+            <button className="btn btn-ghost btn-sm">Añadir al calendario</button>
+          </div>
 
-        <button
-          className="btn btn-primary btn-lg"
-          style={{ width: '100%' }}
-          onClick={() => navigate(`/queue/${event.id}`)}
-          disabled={event.availableStock <= 0}
-        >
-          {event.availableStock > 0 ? '🎯 Comprar entradas' : '😔 Agotado'}
-        </button>
+          <div className="info-chips">
+            <span>📅 {formatDate(event.date)}</span>
+            <span>📍 {event.venue}</span>
+            <span>🎟️ {event.availableStock} de {event.totalCapacity} disponibles</span>
+          </div>
+
+          <div className="event-description">
+            <h3>Sobre el evento</h3>
+            <p>{event.description}</p>
+          </div>
+
+          {/* Venue */}
+          <h3 style={{ fontSize: 17, fontWeight: 700, margin: '24px 0 14px' }}>El recinto</h3>
+          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
+            <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{event.venue}</h4>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+              Las puertas abren una hora antes del inicio.
+            </p>
+          </div>
+        </div>
+
+        {/* Ticket selector */}
+        <div>
+          <div className="ticket-selector">
+            <h3>Seleccioná tus entradas</h3>
+            <p className="ts-sub">{formatDate(event.date)}</p>
+
+            <div className="ticket-row">
+              <div>
+                <div className="ticket-name">Entrada general</div>
+                <div className="ticket-desc">Acceso al evento</div>
+                <div className="ticket-price">{formatPrice(event.price)}</div>
+              </div>
+              <div className="qty-picker">
+                <button className="qty-btn" onClick={() => setQty(Math.max(1, qty - 1))} disabled={qty <= 1}>−</button>
+                <span className="qty-val">{qty}</span>
+                <button className="qty-btn" onClick={() => setQty(Math.min(maxQty, qty + 1))} disabled={qty >= maxQty || soldOut}>+</button>
+              </div>
+            </div>
+
+            <div className="total-line">
+              <span>Total</span>
+              <span>{formatPrice(total)}</span>
+            </div>
+
+            <button
+              className="btn btn-accent btn-block btn-lg"
+              style={{ marginTop: 4 }}
+              onClick={() => navigate(`/queue/${event.id}`)}
+              disabled={soldOut}
+            >
+              {soldOut ? 'Agotado' : 'Reservar entradas →'}
+            </button>
+            {!soldOut && (
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', marginTop: 8 }}>
+                Evento de alta demanda · al reservar entrarás en la cola de espera
+              </p>
+            )}
+
+            <div className="capacity-bar">
+              <span>{sold}/{event.totalCapacity} vendidas</span>
+              <div className="cap-bar-fill"><div style={{ width: `${soldPct}%` }} /></div>
+              <span>{soldPct}%</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
