@@ -1,17 +1,21 @@
-name: CI
+name: CI/CD
 
 on:
   push:
     branches: [master]
+    tags: ['v*']
   pull_request:
     branches: [master]
+  workflow_dispatch:
 
-# Cancela corridas anteriores del mismo ref si llega un push nuevo.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: cicd-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # ----------------------------------------------------------------
+  # CI — build / validación
+  # ----------------------------------------------------------------
   java:
     name: Build Java · ${{ matrix.service }}
     runs-on: ubuntu-latest
@@ -70,6 +74,9 @@ jobs:
           cp .env.example .env
           docker compose config -q
 
+  # ----------------------------------------------------------------
+  # CI — smoke test de salud (depende de los builds)
+  # ----------------------------------------------------------------
   smoke:
     name: Health smoke test
     runs-on: ubuntu-latest
@@ -121,3 +128,63 @@ jobs:
       - name: Limpieza
         if: always()
         run: docker compose down -v
+
+  # ----------------------------------------------------------------
+  # CD — publicar imágenes en GHCR (solo si TODO el CI pasó)
+  # Se omite en PRs; corre en push a master y en tags v*.
+  # ----------------------------------------------------------------
+  publish:
+    name: Publish ${{ matrix.name }} → GHCR
+    runs-on: ubuntu-latest
+    needs: [java, node-auth, web-ui, config, smoke]
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: auth,         context: ./services/auth }
+          - { name: catalog,      context: ./services/catalog }
+          - { name: reservation,  context: ./services/reservation }
+          - { name: waiting-room, context: ./services/waiting-room }
+          - { name: web-ui,       context: ./web-ui }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lowercase owner
+        id: owner
+        run: echo "lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login a GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata / tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.owner.outputs.lc }}/event-pass-${{ matrix.name }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
