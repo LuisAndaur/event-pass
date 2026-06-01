@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - run: npm install
         working-directory: services/auth
       - name: Syntax check
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - run: npm install
         working-directory: web-ui
       - run: npm run build
@@ -69,3 +69,55 @@ jobs:
         run: |
           cp .env.example .env
           docker compose config -q
+
+  smoke:
+    name: Health smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [java, node-auth, web-ui, config]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar .env
+        run: cp .env.example .env
+
+      - name: Levantar el núcleo de la app (sin observabilidad)
+        # Solo gateway + sus dependencias (auth, catalog, reservation, waiting-room,
+        # MySQL x2, Redis, Kafka, Zookeeper). 1 réplica por servicio para ahorrar recursos.
+        run: |
+          docker compose up -d --build \
+            --scale auth=1 --scale catalog=1 --scale reservation=1 --scale waiting-room=1 \
+            gateway
+
+      - name: Esperar readiness y chequear salud (vía gateway)
+        run: |
+          ready=0
+          for i in $(seq 1 60); do
+            TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+              -H "Content-Type: application/json" \
+              -d '{"email":"admin@admin.com","password":"123456"}' \
+              | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+            if [ -n "$TOKEN" ]; then
+              e=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/events)
+              t=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/tickets)
+              w=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/waiting-room/status?eventId=ci&userId=ci")
+              echo "intento $i: auth=200 events=$e tickets=$t waiting-room=$w"
+              if [ "$e" = "200" ] && [ "$t" = "200" ] && [ "$w" = "200" ]; then ready=1; break; fi
+            else
+              echo "intento $i: auth/gateway aún no responden"
+            fi
+            sleep 5
+          done
+          if [ "$ready" != "1" ]; then
+            echo "::error::Las APIs no quedaron saludables dentro del tiempo esperado"
+            exit 1
+          fi
+          echo "✅ Salud OK: login + catalog + reservation + waiting-room responden 200 vía gateway"
+
+      - name: Logs de los servicios (si falla)
+        if: failure()
+        run: docker compose logs --tail=100 gateway auth catalog reservation waiting-room
+
+      - name: Limpieza
+        if: always()
+        run: docker compose down -v
