@@ -168,11 +168,16 @@ services:
       PORT: 8084
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS}
+      OTEL_SERVICE_NAME: eventpass-auth
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://apm-server:8200
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=eventpass,deployment.environment=mvp
     deploy:
       replicas: 2
       resources:
         limits:
-          memory: 128M
+          memory: 192M
 
   waiting-room:
     build:
@@ -186,7 +191,13 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS}
-      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"
+      JAVA_TOOL_OPTIONS: "-javaagent:/app/otel-agent.jar -XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"
+      OTEL_SERVICE_NAME: eventpass-waiting-room
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://apm-server:8200
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=eventpass,deployment.environment=mvp
     depends_on:
       redis:
         condition: service_healthy
@@ -194,7 +205,7 @@ services:
       replicas: 2
       resources:
         limits:
-          memory: 384M
+          memory: 512M
 
   catalog:
     build:
@@ -210,7 +221,13 @@ services:
       MYSQL_PASSWORD: ${MYSQL_CATALOG_PASSWORD}
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"
+      JAVA_TOOL_OPTIONS: "-javaagent:/app/otel-agent.jar -XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"
+      OTEL_SERVICE_NAME: eventpass-catalog
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://apm-server:8200
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=eventpass,deployment.environment=mvp
     depends_on:
       mysql-catalog:
         condition: service_healthy
@@ -220,7 +237,7 @@ services:
       replicas: 2
       resources:
         limits:
-          memory: 384M
+          memory: 512M
 
   reservation:
     build:
@@ -236,7 +253,13 @@ services:
       MYSQL_PASSWORD: ${MYSQL_RESERVATION_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_SECRET: ${JWT_SECRET}
-      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"
+      JAVA_TOOL_OPTIONS: "-javaagent:/app/otel-agent.jar -XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k"
+      OTEL_SERVICE_NAME: eventpass-reservation
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://apm-server:8200
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=eventpass,deployment.environment=mvp
     depends_on:
       mysql-reservation:
         condition: service_healthy
@@ -246,7 +269,7 @@ services:
       replicas: 2
       resources:
         limits:
-          memory: 384M
+          memory: 512M
 
   # ============================================
   # WEB UI
@@ -274,12 +297,34 @@ services:
     networks: [event-pass-net]
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
     ports: ["9200:9200"]
     mem_limit: 1g
+
+  # Init: espera a ES y fija la contraseña del usuario kibana_system.
+  es-setup:
+    image: curlimages/curl:latest
+    networks: [event-pass-net]
+    depends_on:
+      - elasticsearch
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      KIBANA_PASSWORD: ${KIBANA_PASSWORD}
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        until curl -s -u elastic:$${ELASTIC_PASSWORD} http://elasticsearch:9200/_cluster/health | grep -q '"status"'; do
+          echo "esperando a Elasticsearch..."; sleep 5;
+        done;
+        echo "fijando password de kibana_system...";
+        curl -s -u elastic:$${ELASTIC_PASSWORD} -X POST http://elasticsearch:9200/_security/user/kibana_system/_password \
+          -H "Content-Type: application/json" -d "{\"password\":\"$${KIBANA_PASSWORD}\"}";
+        echo "listo.";
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
@@ -287,10 +332,15 @@ services:
     networks: [event-pass-net]
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=eventpass_kibana_saved_objects_key_32chars
+      - XPACK_FLEET_AGENTS_ENABLED=true
     ports: ["5601:5601"]
     mem_limit: 1g
     depends_on:
-      - elasticsearch
+      es-setup:
+        condition: service_completed_successfully
 
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.11.0
@@ -298,12 +348,32 @@ services:
     user: root
     networks: [event-pass-net]
     command: ["--strict.perms=false", "-e"]
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
     volumes:
       - ./monitoring/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
-      - elasticsearch
+      - es-setup
+
+  # ============================================
+  # OBSERVABILIDAD — TRAZAS (Elastic APM vía OTLP)
+  # ============================================
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:8.11.0
+    container_name: eventpass-apm-server
+    networks: [event-pass-net]
+    command: ["--strict.perms=false", "-e"]
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+    volumes:
+      - ./monitoring/apm-server/apm-server.yml:/usr/share/apm-server/apm-server.yml:ro
+    ports: ["8200:8200"]
+    mem_limit: 512m
+    depends_on:
+      - es-setup
 
   # otel-collector:
   #   image: otel/opentelemetry-collector-contrib:latest

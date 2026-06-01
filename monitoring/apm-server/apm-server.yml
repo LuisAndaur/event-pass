@@ -1,0 +1,21 @@
+# APM Server — recibe trazas OTLP (de las APIs instrumentadas con OpenTelemetry)
+# y las escribe en Elasticsearch. Se visualizan en Kibana → Observability → APM.
+
+apm-server:
+  host: "0.0.0.0:8200"
+  # La "APM integration" se instala vía Fleet (Kibana con seguridad), que provee
+  # los index templates con los mappings correctos para la UI de APM.
+  # Dev/MVP: sin token de seguridad (cualquier agente puede enviar).
+  auth:
+    anonymous:
+      enabled: true
+      allow_agent: []
+      allow_service: []
+    secret_token: ""
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  username: "elastic"
+  password: "${ELASTIC_PASSWORD}"
+
+logging.level: info

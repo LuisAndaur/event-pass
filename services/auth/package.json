@@ -8,6 +8,8 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.52.1",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "swagger-ui-express": "^5.0.1"

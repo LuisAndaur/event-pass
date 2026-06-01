@@ -61,6 +61,10 @@ GATEWAY_PORT=8080
 # JWT (compartido entre auth-service y waiting-room)
 JWT_SECRET=eventpass-super-secret-jwt-key-2024-must-be-at-least-256-bits-long
 JWT_EXPIRATION_MS=86400000
+
+# Elastic Stack (seguridad — para logs y trazas en Kibana)
+ELASTIC_PASSWORD=elastic123
+KIBANA_PASSWORD=kibana123
 ```
 
 ### 2. Levantar los servicios
@@ -98,8 +102,9 @@ docker compose up --build
 | Reservation | dinámico ×2 | 8083 | Reservas y pagos (escalado) |
 | Prometheus | 9090 | 9090 | Métricas |
 | Grafana | 3001 | 3000 | Dashboards (admin/admin) |
-| Elasticsearch | 9200 | 9200 | Almacenamiento de logs |
-| Kibana | 5601 | 5601 | Visualización de logs |
+| Elasticsearch | 9200 | 9200 | Logs + trazas (requiere login `elastic`) |
+| Kibana | 5601 | 5601 | Logs + APM (requiere login `elastic`) |
+| APM Server | 8200 | 8200 | Ingesta de trazas OTLP |
 | Kafka | 9092 | 9092 | Mensajería |
 | MySQL Catalog | 3307 | 3306 | BD de eventos |
 | MySQL Reservation | 3308 | 3306 | BD de reservas |
@@ -242,22 +247,61 @@ Los logs se indexan en `eventpass-logs-*`, con metadata por contenedor (`contain
 `container.image`, etc.).
 
 **Cómo ver los logs:**
-1. Abrí **http://localhost:5601** → menú **☰ → Analytics → Discover**.
-2. Seleccioná el data view **EventPass Logs** (se crea automáticamente; si no, crealo sobre el
+1. Abrí **http://localhost:5601** e iniciá sesión con **`elastic` / `${ELASTIC_PASSWORD}`**
+   (por defecto `elastic123`).
+2. Menú **☰ → Analytics → Discover**.
+3. Seleccioná el data view **EventPass Logs** (se crea automáticamente; si no, crealo sobre el
    patrón `eventpass-logs-*` con time field `@timestamp`).
-3. Filtrá por servicio o contenido, por ejemplo:
+4. Filtrá por servicio o contenido, por ejemplo:
    - `container.name: "event-pass-catalog-1"` — logs de una réplica de catalog.
    - `container.name: *reservation*` — todas las réplicas de reservation.
    - `message: *ERROR*` — solo errores.
 
 **Notas:**
+- Kibana y Elasticsearch tienen **seguridad habilitada** (necesaria para las trazas/Fleet), así
+  que piden login (`elastic` / `elastic123`).
 - ELK suma ~2.2 GB de RAM (ES 1g + Kibana 1g + Filebeat ~150m). En un host justo, podés bajar
   réplicas de las APIs mientras usás Kibana.
 - Los logs se ingestan como texto plano (campo `message`). Para verlos **estructurados** en
   Kibana (nivel, logger, etc. como campos) se puede activar logging JSON/ECS en los servicios
   Java — queda como mejora opcional.
-- **OpenTelemetry** no es necesario para los logs; serviría para **trazas distribuidas**
-  (seguir un request entre servicios), que es complementario y queda como paso futuro.
+
+## Trazas distribuidas (APM)
+
+Trazas de extremo a extremo con **OpenTelemetry → APM Server → Elasticsearch → Kibana APM**.
+Permite seguir un request a través de los servicios y ver latencias, errores y dependencias
+(incluyendo spans de MySQL y Kafka).
+
+**Instrumentación** (automática, sin tocar código de negocio):
+- Servicios Java (catalog, reservation, waiting-room): **OpenTelemetry Java Agent** vía
+  `-javaagent` (en el `Dockerfile` + `JAVA_TOOL_OPTIONS`). Auto-instrumenta Spring, JDBC y Kafka.
+- `auth` (Node): `@opentelemetry/auto-instrumentations-node` cargado con `--require`.
+- Todos exportan **OTLP** a `apm-server:8200` (configurado por variables `OTEL_*` en el compose).
+
+**Componentes:**
+- `apm-server` (8.11) — recibe OTLP y escribe a Elasticsearch; config en
+  [`monitoring/apm-server/apm-server.yml`](monitoring/apm-server/apm-server.yml).
+- La **APM integration** de Kibana provee los index templates (se instala vía Fleet — requiere
+  la seguridad del Elastic Stack habilitada).
+
+**Cómo ver las trazas:**
+1. Abrí **http://localhost:5601** (login `elastic` / `elastic123`).
+2. Menú **☰ → Observability → APM**.
+3. Vas a ver los servicios (`eventpass-catalog`, `eventpass-reservation`,
+   `eventpass-waiting-room`, `eventpass-auth`); entrá a uno para ver transacciones, latencias,
+   throughput, errores y el mapa de dependencias.
+
+**Instalación de la APM integration** (una vez, si arrancás desde cero): tras levantar el stack
+y que Kibana esté listo, instalá el paquete vía Fleet:
+```bash
+curl -s -u elastic:elastic123 "http://localhost:5601/api/fleet/epm/packages/apm" -H "kbn-xsrf: true" \
+  | grep -o '"latestVersion":"[^"]*"'   # ver la versión, p.ej. 8.11.0
+curl -s -X POST "http://localhost:5601/api/fleet/epm/packages/apm/8.11.0" \
+  -H "kbn-xsrf: true" -H "Content-Type: application/json" -u elastic:elastic123 -d '{"force":true}'
+```
+
+**Nota de recursos:** el APM Server (~512m) y los agentes Java suman carga. En el host de bajos
+recursos, durante el análisis de trazas conviene bajar las APIs a `--scale <svc>=1`.
 
 ## Estructura del proyecto
 ```
@@ -273,7 +317,7 @@ event-pass/
 │   ├── catalog/            # Catálogo de eventos (MySQL + Redis)
 │   └── reservation/        # Reservas y pagos (MySQL + Kafka)
 ├── web-ui/                 # React SPA (Vite)
-├── monitoring/             # Prometheus + Grafana
+├── monitoring/             # Prometheus, Grafana, Filebeat (logs), APM Server (trazas)
 ├── perf/                   # Pruebas de carga (k6)
 └── docs/                   # Documentación
 ```
@@ -290,6 +334,9 @@ event-pass/
   Un evento creado por el organizador nace con el stock del catálogo, pero el Reservation
   Service crea su propio inventario (con un valor por defecto) en la primera reserva.
 - Los workers de **Payment** y **Notification** están mockeados (embebidos en Reservation Service).
-- **Logs**: ELK (Filebeat → Elasticsearch → Kibana) está activo (ver sección *Visualización de logs*).
-  El OTel Collector sigue comentado en `docker-compose.yml`, listo para activar si se quieren trazas.
+- **Observabilidad**: métricas (Prometheus + Grafana), logs (Filebeat → Elasticsearch → Kibana)
+  y trazas (OpenTelemetry → APM Server → Kibana APM) están activos. Ver las secciones
+  *Visualización de logs* y *Trazas distribuidas*.
+- **Seguridad del Elastic Stack** habilitada (login `elastic`/`elastic123`); fue necesaria para
+  Fleet y la APM integration. Un contenedor init (`es-setup`) fija la clave de `kibana_system`.
 - Cada servicio Java usa multi-stage Docker build (Maven → JRE) para imágenes optimizadas.
