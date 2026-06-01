@@ -1,5 +1,8 @@
 # EventPass — Sistema de Gestión de Eventos y Entradas
 
+![CI](https://github.com/LuisAndaur/event-pass/actions/workflows/ci.yml/badge.svg)
+![CD](https://github.com/LuisAndaur/event-pass/actions/workflows/cd.yml/badge.svg)
+
 ## Descripción
 Sistema distribuido de venta de entradas diseñado para soportar alta concurrencia (Thundering Herd) mediante una arquitectura de microservicios con sala de espera virtual, procesamiento asíncrono de pagos y garantía de no sobreventa.
 
@@ -302,6 +305,33 @@ curl -s -X POST "http://localhost:5601/api/fleet/epm/packages/apm/8.11.0" \
 
 **Nota de recursos:** el APM Server (~512m) y los agentes Java suman carga. En el host de bajos
 recursos, durante el análisis de trazas conviene bajar las APIs a `--scale <svc>=1`.
+
+## CI/CD (GitHub Actions)
+
+Dos pipelines en `.github/workflows/`:
+
+**CI** ([`ci.yml`](.github/workflows/ci.yml)) — en cada push y PR a `master`:
+- Build de los 3 servicios Java (`mvn package`, con cache de Maven).
+- Build de `auth` (Node) y de `web-ui` (`npm run build`).
+- Validación de la config del gateway (`krakend check`) y del `docker-compose.yml`.
+
+**CD** ([`cd.yml`](.github/workflows/cd.yml)) — al mergear a `master` y en tags `v*`:
+- Construye y publica 5 imágenes en **GHCR**:
+  `ghcr.io/luisandaur/event-pass-{auth,catalog,reservation,waiting-room,web-ui}`.
+- Tags: `latest` (en master), `sha-<commit>` y semver (`1.2.3`, `1.2`) en tags `v*`.
+- Usa `GITHUB_TOKEN` (sin secrets adicionales) y cache de capas Docker.
+
+**Deploy desde GHCR:** cada servicio en `docker-compose.yml` declara `image:` además de `build:`,
+así que en un servidor podés consumir las imágenes publicadas sin compilar:
+```bash
+docker compose pull && docker compose up -d
+```
+> Tras el primer run de CD, los paquetes de GHCR son **privados** por defecto. Para `pull` sin
+> autenticación, hacelos públicos en GitHub → *Packages* → *Package settings* → *Change visibility*;
+> o autenticá con `docker login ghcr.io`.
+
+> No hay tests aún, así que el CI valida compilación/build. Al agregar tests (JUnit / Vitest) se
+> enchufan en los jobs existentes.
 
 ## Estructura del proyecto
 ```

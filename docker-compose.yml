@@ -161,6 +161,7 @@ services:
     build:
       context: ./services/auth
       dockerfile: Dockerfile
+    image: ghcr.io/luisandaur/event-pass-auth:latest
     restart: on-failure
     networks: [event-pass-net]
     ports: ["8084"]
@@ -183,6 +184,7 @@ services:
     build:
       context: ./services/waiting-room
       dockerfile: Dockerfile
+    image: ghcr.io/luisandaur/event-pass-waiting-room:latest
     restart: on-failure
     networks: [event-pass-net]
     ports: ["8081"]
@@ -211,6 +213,7 @@ services:
     build:
       context: ./services/catalog
       dockerfile: Dockerfile
+    image: ghcr.io/luisandaur/event-pass-catalog:latest
     restart: on-failure
     networks: [event-pass-net]
     ports: ["8082"]
@@ -243,6 +246,7 @@ services:
     build:
       context: ./services/reservation
       dockerfile: Dockerfile
+    image: ghcr.io/luisandaur/event-pass-reservation:latest
     restart: on-failure
     networks: [event-pass-net]
     ports: ["8083"]
@@ -279,6 +283,7 @@ services:
     build:
       context: ./web-ui
       dockerfile: Dockerfile
+    image: ghcr.io/luisandaur/event-pass-web-ui:latest
     container_name: eventpass-web-ui
     networks: [event-pass-net]
     ports: ["3000:3000"]
