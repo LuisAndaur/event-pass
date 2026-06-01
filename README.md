@@ -98,6 +98,8 @@ docker compose up --build
 | Reservation | dinámico ×2 | 8083 | Reservas y pagos (escalado) |
 | Prometheus | 9090 | 9090 | Métricas |
 | Grafana | 3001 | 3000 | Dashboards (admin/admin) |
+| Elasticsearch | 9200 | 9200 | Almacenamiento de logs |
+| Kibana | 5601 | 5601 | Visualización de logs |
 | Kafka | 9092 | 9092 | Mensajería |
 | MySQL Catalog | 3307 | 3306 | BD de eventos |
 | MySQL Reservation | 3308 | 3306 | BD de reservas |
@@ -224,6 +226,39 @@ docker run --rm -i --network event-pass_event-pass-net -e PEAK_VUS=100 -v "${PWD
 > carpeta del proyecto). Verificalo con `docker network ls` si tu carpeta tiene otro nombre.
 > Mientras corre, podés observar el impacto en vivo en Grafana (dashboard *EventPass — Overview*).
 
+## Visualización de logs (ELK)
+
+Stack de logs centralizados: **Filebeat → Elasticsearch → Kibana**. Filebeat lee el `stdout`
+de todos los contenedores del proyecto (incluidas las APIs y sus réplicas) vía el socket de
+Docker, los enriquece con metadata y los indexa en Elasticsearch. No requiere instrumentar las
+apps ni OpenTelemetry: los servicios ya logean a stdout y Filebeat los recolecta directamente.
+
+**Componentes** (definidos en `docker-compose.yml`):
+- `elasticsearch` (8.11, single-node, heap 512m) — almacenamiento, `:9200`.
+- `kibana` (8.11) — visualización, `:5601`.
+- `filebeat` (8.11) — recolección; config en [`monitoring/filebeat/filebeat.yml`](monitoring/filebeat/filebeat.yml).
+
+Los logs se indexan en `eventpass-logs-*`, con metadata por contenedor (`container.name`,
+`container.image`, etc.).
+
+**Cómo ver los logs:**
+1. Abrí **http://localhost:5601** → menú **☰ → Analytics → Discover**.
+2. Seleccioná el data view **EventPass Logs** (se crea automáticamente; si no, crealo sobre el
+   patrón `eventpass-logs-*` con time field `@timestamp`).
+3. Filtrá por servicio o contenido, por ejemplo:
+   - `container.name: "event-pass-catalog-1"` — logs de una réplica de catalog.
+   - `container.name: *reservation*` — todas las réplicas de reservation.
+   - `message: *ERROR*` — solo errores.
+
+**Notas:**
+- ELK suma ~2.2 GB de RAM (ES 1g + Kibana 1g + Filebeat ~150m). En un host justo, podés bajar
+  réplicas de las APIs mientras usás Kibana.
+- Los logs se ingestan como texto plano (campo `message`). Para verlos **estructurados** en
+  Kibana (nivel, logger, etc. como campos) se puede activar logging JSON/ECS en los servicios
+  Java — queda como mejora opcional.
+- **OpenTelemetry** no es necesario para los logs; serviría para **trazas distribuidas**
+  (seguir un request entre servicios), que es complementario y queda como paso futuro.
+
 ## Estructura del proyecto
 ```
 event-pass/
@@ -255,5 +290,6 @@ event-pass/
   Un evento creado por el organizador nace con el stock del catálogo, pero el Reservation
   Service crea su propio inventario (con un valor por defecto) en la primera reserva.
 - Los workers de **Payment** y **Notification** están mockeados (embebidos en Reservation Service).
-- ELK Stack y OpenTelemetry están comentados en `docker-compose.yml`, listos para activar.
+- **Logs**: ELK (Filebeat → Elasticsearch → Kibana) está activo (ver sección *Visualización de logs*).
+  El OTel Collector sigue comentado en `docker-compose.yml`, listo para activar si se quieren trazas.
 - Cada servicio Java usa multi-stage Docker build (Maven → JRE) para imágenes optimizadas.

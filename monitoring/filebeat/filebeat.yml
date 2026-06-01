@@ -1,0 +1,32 @@
+# Filebeat — recolecta los logs (stdout) de los contenedores Docker y los envía
+# a Elasticsearch. Captura todas las APIs y el resto del stack de EventPass.
+
+filebeat.inputs:
+  - type: container
+    paths:
+      - /var/lib/docker/containers/*/*.log
+
+processors:
+  # Enriquecе cada línea con metadata del contenedor (nombre, imagen, labels).
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+  # Acota la ingesta a los contenedores de este proyecto (nombres event-pass* / eventpass*).
+  - drop_event:
+      when:
+        not:
+          regexp:
+            container.name: "^(event-pass|eventpass)"
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "eventpass-logs-%{+yyy.MM.dd}"
+
+# Necesario al usar un índice custom (en vez del filebeat-* por defecto).
+setup.ilm.enabled: false
+setup.template.name: "eventpass-logs"
+setup.template.pattern: "eventpass-logs-*"
+
+setup.kibana:
+  host: "http://kibana:5601"
+
+logging.level: info
