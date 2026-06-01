@@ -1,7 +1,6 @@
 # EventPass — Sistema de Gestión de Eventos y Entradas
 
-![CI](https://github.com/LuisAndaur/event-pass/actions/workflows/ci.yml/badge.svg)
-![CD](https://github.com/LuisAndaur/event-pass/actions/workflows/cd.yml/badge.svg)
+![CI/CD](https://github.com/LuisAndaur/event-pass/actions/workflows/ci.yml/badge.svg)
 
 ## Descripción
 Sistema distribuido de venta de entradas diseñado para soportar alta concurrencia (Thundering Herd) mediante una arquitectura de microservicios con sala de espera virtual, procesamiento asíncrono de pagos y garantía de no sobreventa.
@@ -308,14 +307,19 @@ recursos, durante el análisis de trazas conviene bajar las APIs a `--scale <svc
 
 ## CI/CD (GitHub Actions)
 
-Dos pipelines en `.github/workflows/`:
+Un único pipeline en [`.github/workflows/ci.yml`](.github/workflows/ci.yml) con etapas
+encadenadas: **el CD solo corre si todo el CI pasó**.
 
-**CI** ([`ci.yml`](.github/workflows/ci.yml)) — en cada push y PR a `master`:
+**CI** — en cada push y PR a `master`:
 - Build de los 3 servicios Java (`mvn package`, con cache de Maven).
 - Build de `auth` (Node) y de `web-ui` (`npm run build`).
 - Validación de la config del gateway (`krakend check`) y del `docker-compose.yml`.
+- **Smoke test de salud** (`smoke`): levanta el núcleo de la app y verifica que las APIs
+  respondan 200 vía gateway.
 
-**CD** ([`cd.yml`](.github/workflows/cd.yml)) — al mergear a `master` y en tags `v*`:
+**CD** (job `publish`, con `needs:` de todos los jobs de CI incl. `smoke`) — solo en push a
+`master` y tags `v*` (se omite en PRs):
+- Si **algún** job de CI falla, `publish` **no se ejecuta**.
 - Construye y publica 5 imágenes en **GHCR**:
   `ghcr.io/luisandaur/event-pass-{auth,catalog,reservation,waiting-room,web-ui}`.
 - Tags: `latest` (en master), `sha-<commit>` y semver (`1.2.3`, `1.2`) en tags `v*`.
