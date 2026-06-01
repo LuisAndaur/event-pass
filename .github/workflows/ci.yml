@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# Cancela corridas anteriores del mismo ref si llega un push nuevo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  java:
+    name: Build Java · ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [catalog, reservation, waiting-room]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build (mvn package)
+        run: mvn -B -ntp -f services/${{ matrix.service }}/pom.xml package
+
+  node-auth:
+    name: Build Node · auth
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+        working-directory: services/auth
+      - name: Syntax check
+        run: node --check server.js
+        working-directory: services/auth
+
+  web-ui:
+    name: Build · web-ui
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+        working-directory: web-ui
+      - run: npm run build
+        working-directory: web-ui
+
+  config:
+    name: Validate gateway & compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate KrakenD config
+        run: |
+          docker run --rm -v "${{ github.workspace }}/gateway:/etc/krakend" \
+            devopsfaith/krakend:2.6 check -c /etc/krakend/krakend.json --lint
+      - name: Validate docker-compose
+        run: |
+          cp .env.example .env
+          docker compose config -q
