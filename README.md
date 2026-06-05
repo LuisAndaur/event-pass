@@ -80,7 +80,7 @@ docker compose up --build
 1. Esperar a que todos los servicios estén saludables (~2-5 minutos el primer build).
 2. Abrir http://localhost:3000
 
-### Credenciales de acceso
+### Credenciales de acceso.
 | Tipo de usuario | Email | Contraseña | Acceso |
 |-----------------|-------|------------|--------|
 | Asistente | cualquier email | `pass123` | Catálogo, reservas, mis entradas |
@@ -92,7 +92,7 @@ docker compose up --build
 > panel de administración a `admin@admin.com`. Según el rol, el login redirige automáticamente
 > a `/events` (asistente), `/org` (organizador) o `/admin` (administrador).
 
-### Servicios y puertos
+### Servicios y puertos.
 | Servicio | Puerto host | Puerto interno | Descripción |
 |----------|-------------|----------------|-------------|
 | Web UI | 3000 | 3000 | Frontend React |
