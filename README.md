@@ -20,7 +20,7 @@ Sistema distribuido de venta de entradas diseñado para soportar alta concurrenc
 Web UI (React)
      │
      ▼
-API Gateway (KrakenD)  ──┬── /api/auth/login        → Auth Service (Node/Express) → emite JWT
+API Gateway (KrakenD)  ──┬── /api/auth/login        → Auth Service → emite JWT
                          ├── /api/events/**          → Catalog Service     (MySQL + Redis)
                          ├── /api/waiting-room/**     → Waiting Room        (Redis + SSE)
                          └── /api/tickets/**          → Reservation Service (MySQL + Kafka)
