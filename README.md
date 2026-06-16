@@ -376,8 +376,6 @@ event-pass/
 - Cada servicio Java usa multi-stage Docker build (Maven → JRE) para imágenes optimizadas.
 
 ## Video demo del POC
-![POC](https://drive.google.com/file/d/1kdWJMMEA3F4cPxtLMa-IW4P9qyKWbXcV/view?usp=drive_link)
+https://github.com/user-attachments/assets/3b6cfa15-b4a0-4ca7-9c42-459e1dda2248
+
 - [Video completo](https://drive.google.com/file/d/1s1-yQk4xKPbEwHfbczzUCZQBJXu3iZit/view?usp=drive_link)
-
-
-
