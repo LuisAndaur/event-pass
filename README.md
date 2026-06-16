@@ -374,3 +374,7 @@ event-pass/
 - **Seguridad del Elastic Stack** habilitada (login `elastic`/`elastic123`); fue necesaria para
   Fleet y la APM integration. Un contenedor init (`es-setup`) fija la clave de `kibana_system`.
 - Cada servicio Java usa multi-stage Docker build (Maven → JRE) para imágenes optimizadas.
+
+## Video demo del POC
+
+https://drive.google.com/file/d/1s1-yQk4xKPbEwHfbczzUCZQBJXu3iZit/view?usp=drive_link
