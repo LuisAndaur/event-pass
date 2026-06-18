@@ -8,7 +8,7 @@ Sistema distribuido de venta de entradas diseñado para soportar alta concurrenc
 ## Stack Tecnológico
 - **Frontend**: React 18 + Vite + React Router
 - **API Gateway**: KrakenD 2.6 (Go, bajo consumo de recursos) — enrutamiento + CORS
-- **Auth Service**: Node.js + Express + jsonwebtoken — emite los JWT del login
+- **Auth Service**: Node.js + Express + jsonwebtoken — emite los JWT del login (se uso esta tecnologia para facilitar la POC)
 - **Microservicios**: Java 21 + Spring Boot 3.2
 - **Bases de Datos**: MySQL 8.0 (x2), Redis 7 (caché + cola)
 - **Mensajería**: Apache Kafka 7.6 (Confluent) + Zookeeper
