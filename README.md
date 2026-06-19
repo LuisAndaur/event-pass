@@ -375,7 +375,11 @@ event-pass/
   Fleet y la APM integration. Un contenedor init (`es-setup`) fija la clave de `kibana_system`.
 - Cada servicio Java usa multi-stage Docker build (Maven → JRE) para imágenes optimizadas.
 
+##Prototipo
+https://gold-vulture-401163.hostingersite.com/
+
 ## Video demo del POC
 https://github.com/user-attachments/assets/3b6cfa15-b4a0-4ca7-9c42-459e1dda2248
 
 - [Video completo](https://drive.google.com/file/d/1s1-yQk4xKPbEwHfbczzUCZQBJXu3iZit/view?usp=drive_link)
+
